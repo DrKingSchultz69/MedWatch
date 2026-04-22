@@ -1,0 +1,42 @@
+========================================================================
+MEDWATCH HMS - CHANGELOG & ISSUE RESOLUTION REPORT
+========================================================================
+
+1. ISSUE: "Invalid Email or Password" / ERR_CONNECTION_REFUSED
+   - Root Cause: Multiple `nodemon` terminal instances running the backend simultaneously crashed port `4000`, silently breaking MongoDB and the REST APIs.
+   - Resolution: Ran PowerShell script to forcibly locate and kill zombie processes on port 4000. Successfully restarted the backend `server`, instantly fixing all authentication and connection errors.
+
+2. ISSUE: Doctor Dashboard simulated vitals crashing backend
+   - Root Cause: The Vitals Monitor was attempting to persist dummy randomly-generated "simulated vitals" every 1 second to MongoDB using an invalid `ObjectId`, crashing the backend Mongoose validation.
+   - Resolution: Decoupled the live simulation. The ECG visually simulates live data for aesthetic purposes on the frontend, but the actual Heart Rate, SpO2, Temperature, etc. are now fetched from REAL Database records entered manually by the Receptionist. 
+
+3. ISSUE: Receptionist Dashboard "Enter Vitals" form was fake
+   - Root Cause: The form only popped a toast UI message but did not submit data to the backend.
+   - Resolution: Rewrote the `EnterVitalsForm`. Added a dynamic "Select Patient" dropdown querying `GET /api/users`. Data submitted is correctly parsed and POSTed to `/api/vitals`, syncing immediately with the Doctor's dashboard.
+
+4. ISSUE: "Book Appointment" form only showing 1 dummy doctor
+   - Root Cause: Initially hardcoded to "Dr. Sarah Chen".
+   - Resolution: Created a new route `GET /api/users?role=DOCTOR`. Modified the frontend to populate the dropdown natively using data mapped directly from MongoDB, showcasing their Name and dynamically added "Specialty".
+
+5. ISSUE: Receptionist unable to create Doctors / Pharmacists
+   - Root Cause: Missing functionality and `specialty` fields.
+   - Resolution: 
+     - Added `specialty` optional String field to the `User` MongoDB Schema.
+     - Added Zod Validation support for `specialty` in backend Register route.
+     - Built `RegisterDoctorForm` and `RegisterPharmacistForm` inside the Receptionist Dashboard. This enables them to set passwords and register Staff immediately into the backend.
+
+6. ISSUE: Patient Dashboard did not have native Booking
+   - Root Cause: Lack of secure context-aware booking for patients.
+   - Resolution: Built a secure `BookAppointmentForm` natively in `PatientDashboard.tsx`. By decoding the JSON Web Token (`localStorage.getItem('medwatch_token')`), the form extracts their exact internal DB `userID` to securely book appointments without risking assigning it to a different patient.
+
+7. ISSUE: Pharmacist Dashboard functionality check
+   - Resolution: Verified. Because of how the `getPrescriptions` controller was architected, the backend detects if `req.user.role === 'PHARMACIST'` and intentionally skips the patient/doctor filter, delivering ALL pending prescriptions beautifully to their dashboard. The Dispense button cleanly fires a `PATCH /api/prescriptions/:id/status` transitioning the DB record to "dispensed", resolving it immediately.
+
+========================================================================
+NEW FEATURES ADDED TODAY:
+- Secure JWT User decoding on Frontend
+- MongoDB native Appointment booking flows
+- MongoDB native Vital registration sync
+- Complete User Registry for all 4 Roles (Patient, Doctor, Receptionist, Pharmacist)
+- Persistent real-time tracking metrics
+========================================================================
