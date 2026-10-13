@@ -9,7 +9,7 @@ import { Stethoscope, Users, FileText, Activity, Heart, Thermometer, Wind, Dropl
 import { motion } from 'framer-motion';
 import { useDeviceType } from '@/hooks/useDeviceType';
 
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 function getToken(): string | null {
   return localStorage.getItem('medwatch_token');

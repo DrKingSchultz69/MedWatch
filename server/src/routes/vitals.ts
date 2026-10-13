@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getVitalsHistory, getAllVitals, recordVitals } from '../controllers/vitalsController';
+import { getVitalsHistory, getAllVitals, recordVitals, getLiveVitals } from '../controllers/vitalsController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { roleMiddleware } from '../middleware/roleMiddleware';
 
@@ -13,6 +13,9 @@ router.get('/all', getAllVitals);
 
 // GET vitals history for a specific patient
 router.get('/:patientId/history', getVitalsHistory);
+
+// GET next simulated live reading (polled in place of the WebSocket stream)
+router.get('/:patientId/live', getLiveVitals);
 
 // POST new vitals reading (receptionist or doctor)
 router.post('/', roleMiddleware('RECEPTIONIST', 'DOCTOR'), recordVitals);

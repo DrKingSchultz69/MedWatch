@@ -16,7 +16,7 @@ const MOCK_VITALS_HISTORY = Array.from({ length: 24 }, (_, i) => ({
   temp: +(36.2 + Math.random() * 0.8).toFixed(1),
 }));
 
-const API_BASE = 'http://localhost:4000/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 function getToken(): string | null {
   return localStorage.getItem('medwatch_token');

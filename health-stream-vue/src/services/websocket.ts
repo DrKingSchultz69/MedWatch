@@ -1,97 +1,64 @@
 import { useVitalsStore } from '@/stores/vitalsStore';
 
-const WS_BASE = 'ws://localhost:4000/ws/vitals';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const VITALS_POLL_MS = 2000;
 
 /**
- * Real-time WebSocket client that connects to the backend vitals stream.
- * Falls back to local simulation if WebSocket connection fails.
+ * Real-time vitals client. Polls the backend for the next simulated reading
+ * (serverless hosting can't hold a WebSocket open) and draws the ECG locally.
+ * Falls back to local simulation if the backend can't be reached.
  */
-class VitalsWebSocket {
-  private ws: WebSocket | null = null;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private fallbackInterval: ReturnType<typeof setInterval> | null = null;
+class VitalsPoller {
+  private patientId = 'default';
+  private pollInterval: ReturnType<typeof setInterval> | null = null;
+  private ecgInterval: ReturnType<typeof setInterval> | null = null;
   private ecgPhase = 0;
 
   /**
-   * Connect to the backend WebSocket vitals stream.
+   * Start streaming vitals for a patient.
    * @param patientId - The patient to monitor
    */
   start(patientId?: string) {
-    // Clean up any existing connection
+    // Clean up any existing stream
     this.stop();
 
-    const token = localStorage.getItem('medwatch_token');
-    const pid = patientId || 'default';
+    this.patientId = patientId || 'default';
 
+    // ECG waveform is simulated client-side (it was never persisted)
+    this.ecgInterval = setInterval(() => {
+      useVitalsStore.getState().pushECG(this.generateECG(8));
+    }, 100);
+
+    this.poll();
+    this.pollInterval = setInterval(() => this.poll(), VITALS_POLL_MS);
+  }
+
+  private async poll() {
+    const token = localStorage.getItem('medwatch_token');
     if (token) {
       try {
-        const url = `${WS_BASE}?patientId=${pid}&token=${token}`;
-        this.ws = new WebSocket(url);
-
-        this.ws.onopen = () => {
-          console.log('🔗 Vitals WebSocket connected');
-          // Clear any fallback simulator
-          if (this.fallbackInterval) {
-            clearInterval(this.fallbackInterval);
-            this.fallbackInterval = null;
-          }
-        };
-
-        this.ws.onmessage = (event) => {
-          try {
-            const msg = JSON.parse(event.data);
-            if (msg.type === 'vitals') {
-              useVitalsStore.getState().setVitals(msg.data);
-            } else if (msg.type === 'ecg') {
-              useVitalsStore.getState().pushECG(msg.data);
-            }
-          } catch (err) {
-            console.error('Failed to parse WS message:', err);
-          }
-        };
-
-        this.ws.onclose = () => {
-          console.log('🔌 Vitals WebSocket disconnected');
-          // Fall back to local simulation
-          this.startFallback();
-          // Try reconnect after 5s
-          this.reconnectTimer = setTimeout(() => this.start(patientId), 5000);
-        };
-
-        this.ws.onerror = (err) => {
-          console.warn('WebSocket error, falling back to local simulation:', err);
-        };
-
-        return;
+        const res = await fetch(`${API_BASE}/vitals/${encodeURIComponent(this.patientId)}/live`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          useVitalsStore.getState().setVitals(await res.json());
+          return;
+        }
       } catch {
-        console.warn('WebSocket connection failed, using local simulation');
+        // fall through to local simulation
       }
     }
 
     // Fallback: local simulation (same as original VitalsSimulator)
-    this.startFallback();
-  }
-
-  /**
-   * Local fallback simulator (same algorithm as original code).
-   */
-  private startFallback() {
-    if (this.fallbackInterval) return;
-
-    this.fallbackInterval = setInterval(() => {
-      const vitals = {
-        timestamp: Date.now(),
-        heart_rate: 72 + Math.floor(Math.random() * 12 - 6),
-        spo2: 97 + Math.floor(Math.random() * 3 - 1),
-        temperature: Math.round((36.6 + (Math.random() * 0.6 - 0.3)) * 10) / 10,
-        respiration_rate: 16 + Math.floor(Math.random() * 4 - 2),
-        bp_systolic: 120 + Math.floor(Math.random() * 10 - 5),
-        bp_diastolic: 80 + Math.floor(Math.random() * 8 - 4),
-      };
-
-      useVitalsStore.getState().setVitals(vitals);
-      useVitalsStore.getState().pushECG(this.generateECG(8));
-    }, 100);
+    useVitalsStore.getState().setVitals({
+      timestamp: Date.now(),
+      heart_rate: 72 + Math.floor(Math.random() * 12 - 6),
+      spo2: 97 + Math.floor(Math.random() * 3 - 1),
+      temperature: Math.round((36.6 + (Math.random() * 0.6 - 0.3)) * 10) / 10,
+      respiration_rate: 16 + Math.floor(Math.random() * 4 - 2),
+      bp_systolic: 120 + Math.floor(Math.random() * 10 - 5),
+      bp_diastolic: 80 + Math.floor(Math.random() * 8 - 4),
+    });
   }
 
   private generateECG(count: number): number[] {
@@ -115,25 +82,19 @@ class VitalsWebSocket {
    * Change the patient being monitored.
    */
   changePatient(patientId: string) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'changePatient', patientId }));
-    }
+    this.patientId = patientId;
   }
 
   stop() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
     }
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    if (this.fallbackInterval) {
-      clearInterval(this.fallbackInterval);
-      this.fallbackInterval = null;
+    if (this.ecgInterval) {
+      clearInterval(this.ecgInterval);
+      this.ecgInterval = null;
     }
   }
 }
 
-export const vitalsSimulator = new VitalsWebSocket();
+export const vitalsSimulator = new VitalsPoller();

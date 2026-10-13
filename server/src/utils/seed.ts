@@ -1,3 +1,4 @@
+import dns from 'dns';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
@@ -8,7 +9,10 @@ import User from '../models/User';
 import Appointment from '../models/Appointment';
 import Prescription from '../models/Prescription';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/medwatch';
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/medwatch';
+
+// Some local resolvers (common on Windows) refuse the SRV lookup mongodb+srv needs; use public DNS
+if (MONGO_URI.startsWith('mongodb+srv://')) dns.setServers(['1.1.1.1', '8.8.8.8']);
 
 // ═══════════════════════════════════════════════════════
 // Demo Users (matching frontend exactly)
@@ -43,7 +47,7 @@ const DEMO_USERS = [
 async function seed() {
   try {
     console.log('🌱 Starting seed...');
-    console.log(`📦 Connecting to: ${MONGO_URI}`);
+    console.log(`📦 Connecting to: ${MONGO_URI.replace(/\/\/[^@/]*@/, '//***@')}`);
 
     await mongoose.connect(MONGO_URI);
     console.log('✅ Connected to MongoDB');

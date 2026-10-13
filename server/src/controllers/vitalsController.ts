@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import VitalReading from '../models/VitalReading';
+import mongoose from 'mongoose';
 import { ApiError } from '../middleware/errorHandler';
+import { generateVitals } from '../services/vitalsSimulator';
 
 /**
  * GET /api/vitals/:patientId/history?limit=60
@@ -103,6 +105,31 @@ export const recordVitals = async (req: Request, res: Response, next: NextFuncti
     });
 
     res.status(201).json(reading);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/vitals/:patientId/live
+ * Generate the next simulated reading for a patient (polled by the frontend;
+ * replaces the WebSocket stream, which serverless hosting can't keep open).
+ */
+export const getLiveVitals = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const patientId = String(req.params.patientId);
+    const vitals = generateVitals(patientId);
+
+    // Persist only if patientId is a valid ObjectId
+    if (mongoose.Types.ObjectId.isValid(patientId)) {
+      try {
+        await VitalReading.create({ patientId, ...vitals });
+      } catch (err: any) {
+        console.error('Failed to persist vital reading:', err.message);
+      }
+    }
+
+    res.json(vitals);
   } catch (error) {
     next(error);
   }

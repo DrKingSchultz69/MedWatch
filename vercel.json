@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install --prefix server && npm install --prefix health-stream-vue",
+  "buildCommand": "npm run build --prefix health-stream-vue",
+  "outputDirectory": "health-stream-vue/dist",
+  "framework": null,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

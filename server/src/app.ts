@@ -15,6 +15,9 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
+// Behind Vercel's proxy: trust X-Forwarded-For so rate limiting sees real client IPs
+app.set('trust proxy', 1);
+
 // ─── Security ────────────────────────────────────────
 app.use(helmet());
 
