@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAppointmentStore } from '@/stores/appointmentStore';
-import { usePrescriptionStore } from '@/stores/prescriptionStore';
-import { CalendarDays, FileText, BarChart3 } from 'lucide-react';
+import { usePrescriptionStore, type Prescription } from '@/stores/prescriptionStore';
+import { CalendarDays, FileText, BarChart3, Pill, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -86,6 +86,17 @@ export default function PatientDashboard() {
               </div>
             </motion.div>
           ))}
+
+          <div className="flex items-center justify-between pt-4">
+            <h2 className="font-heading font-semibold text-lg">Recent Prescriptions</h2>
+            {prescriptions.length > 0 && (
+              <button onClick={() => setView('prescriptions')} className="text-sm text-primary hover:underline flex items-center gap-1">
+                View all <ChevronRight size={14} />
+              </button>
+            )}
+          </div>
+          {prescriptions.length === 0 && <p className="text-muted-foreground text-sm">No prescriptions yet.</p>}
+          {prescriptions.slice(0, 2).map((rx) => <PrescriptionCard key={rx.id} rx={rx} />)}
         </div>
       )}
       {view === 'book' && <BookAppointmentForm onBook={addAppointment} doctors={doctors} onSuccess={() => setView('appointments')} />}
@@ -93,17 +104,10 @@ export default function PatientDashboard() {
         <div className="space-y-3">
           <h2 className="font-heading font-semibold text-lg">My Prescriptions</h2>
           {prescriptions.length === 0 && <p className="text-muted-foreground text-sm">No prescriptions found.</p>}
-          {prescriptions.map((rx) => (
-            <div key={rx.id} className="glass-card p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-medium">{rx.diagnosis}</p>
-                <span className={`text-xs px-2 py-1 rounded-full ${rx.status === 'dispensed' ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'}`}>{rx.status}</span>
-              </div>
-              <p className="text-xs text-muted-foreground mb-2">{rx.doctorName} • {rx.date}</p>
-              {rx.medications.map((med: any, i: number) => (
-                <p key={i} className="text-sm">• {med.name} {med.dosage} — {med.frequency}</p>
-              ))}
-            </div>
+          {prescriptions.map((rx, i) => (
+            <motion.div key={rx.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+              <PrescriptionCard rx={rx} />
+            </motion.div>
           ))}
         </div>
       )}
@@ -137,6 +141,33 @@ export default function PatientDashboard() {
         </div>
       )}
     </DashboardLayout>
+  );
+}
+
+function PrescriptionCard({ rx }: { rx: Prescription }) {
+  return (
+    <div className="glass-card p-4">
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <p className="font-medium">{rx.diagnosis}</p>
+        <span className={`text-xs px-2 py-1 rounded-full capitalize shrink-0 ${
+          rx.status === 'dispensed' ? 'bg-success/20 text-success' :
+          rx.status === 'cancelled' ? 'bg-danger/20 text-danger' :
+          'bg-warning/20 text-warning'
+        }`}>{rx.status}</span>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">Prescribed by {rx.doctorName} • {rx.date}</p>
+      <div className="space-y-2">
+        {rx.medications.map((med, i) => (
+          <div key={i} className="flex items-start gap-3 p-2 rounded-lg bg-secondary/50">
+            <Pill size={16} className="text-primary mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium">{med.name} <span className="font-mono text-muted-foreground">{med.dosage}</span></p>
+              <p className="text-xs text-muted-foreground">{med.frequency} • {med.duration}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
