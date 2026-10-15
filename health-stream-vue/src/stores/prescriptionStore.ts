@@ -62,7 +62,7 @@ export const usePrescriptionStore = create<PrescriptionState>((set) => ({
       if (!res.ok) throw new Error('Failed to create prescription');
       const newPrescription = await res.json();
       set((state) => ({
-        prescriptions: [...state.prescriptions, newPrescription],
+        prescriptions: [newPrescription, ...state.prescriptions],
       }));
     } catch (error) {
       console.error('Error creating prescription:', error);
